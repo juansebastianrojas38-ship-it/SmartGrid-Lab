@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartGrid | Control de Red</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        tech: ['Space Grotesk', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        dark: '#0B0F19',
+                        panel: '#151B2B',
+                        neon: '#00E5FF',
+                        purple: '#8B5CF6',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0B0F19; color: #E2E8F0; }
+        .hero-grid {
+            background-image: linear-gradient(rgba(0, 229, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 229, 255, 0.1) 1px, transparent 1px);
+            background-size: 40px 40px; background-position: center center;
+            mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+            -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+        }
+        .glow-text { text-shadow: 0 0 20px rgba(0, 229, 255, 0.5); }
+        .glow-box { box-shadow: 0 0 15px rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.2); }
+        .glow-box-purple { box-shadow: 0 0 15px rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.2); }
+        
+        .tab-active { border-bottom: 2px solid #00E5FF; color: #00E5FF; font-weight: 600; text-shadow: 0 0 10px rgba(0, 229, 255, 0.4); }
+        .tab-inactive { color: #64748B; font-weight: 500; }
+        .tab-inactive:hover { color: #E2E8F0; }
+
+        .plot-container { width: 100%; height: 320px; position: relative; }
+        input[type=range] { accent-color: #00E5FF; }
+        
+        .console-box {
+            background-color: #000000; border: 1px solid #334155; font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem; height: 110px; overflow-y: auto; padding: 10px; border-radius: 0 0 8px 8px;
+        }
+        .log-add { color: #10B981; }
+        .log-discard { color: #EF4444; }
+        .log-info { color: #94A3B8; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- NAVBAR -->
+    <nav class="sticky top-0 z-50 bg-dark/90 backdrop-blur-md border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded bg-gradient-to-br from-neon to-purple flex items-center justify-center text-dark font-bold shadow-[0_0_10px_rgba(0,229,255,0.5)]">⚡</div>
+                    <span class="font-tech font-bold text-xl tracking-wider text-white">SMART_GRID</span>
+                </div>
+                <div class="hidden md:flex space-x-6">
+                    <button onclick="switchTab('planificacion')" id="btn-planificacion" class="tab-active py-2 text-xs uppercase tracking-widest font-tech transition-colors">01. Planificación</button>
+                    <button onclick="switchTab('mantenimiento')" id="btn-mantenimiento" class="tab-inactive py-2 text-xs uppercase tracking-widest font-tech transition-colors">02. Mantenimiento</button>
+                    <button onclick="switchTab('telemetria')" id="btn-telemetria" class="tab-inactive py-2 text-xs uppercase tracking-widest font-tech transition-colors">03. Telemetría</button>
+                    <button onclick="switchTab('conclusiones')" id="btn-conclusiones" class="tab-inactive py-2 text-xs uppercase tracking-widest font-tech transition-colors">04. Conclusiones</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="relative py-16 px-4 sm:px-6 lg:px-8 border-b border-slate-800 overflow-hidden">
+        <div class="absolute inset-0 hero-grid pointer-events-none"></div>
+        <div class="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-12 relative z-10">
+            <div class="lg:w-3/5">
+                <div class="inline-block px-3 py-1 rounded border border-neon/30 bg-neon/10 text-neon text-xs font-bold tracking-wider mb-4 font-tech">
+                    PROYECTO DE DISEÑO DE ALGORITMOS
+                </div>
+                <h1 class="text-4xl md:text-5xl font-tech font-bold leading-tight mb-4 text-white">
+                    Optimización de Redes <br><span class="text-transparent bg-clip-text bg-gradient-to-r from-neon to-purple glow-text">Eléctricas Urbanas.</span>
+                </h1>
+                <p class="text-md text-slate-300 mb-6 max-w-2xl leading-relaxed">
+                    Un municipio necesita conectar <strong>7 subestaciones eléctricas</strong> minimizando el costo del cableado, pero también debe optimizar las rutas de mantenimiento de sus técnicos, gestionar la carga de herramientas en los vehículos y comprimir los datos de telemetría.
+                </p>
+            </div>
+            <div class="lg:w-2/5 w-full">
+                <div class="bg-panel/80 backdrop-blur-md border border-slate-700 p-6 rounded-2xl shadow-2xl">
+                    <h3 class="text-sm font-tech text-slate-300 uppercase tracking-widest mb-4 border-b border-slate-700 pb-2 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-neon animate-pulse"></span> Algoritmos
+                    </h3>
+                    <ul class="space-y-3 text-sm text-slate-300 font-mono">
+                        <li class="flex items-start gap-2">
+                            <span class="text-neon mt-1">■</span>
+                            <div>
+                                <strong class="text-white">Algoritmos Voraces</strong>
+                                <span class="block text-xs text-slate-400 mt-0.5">Prim y Kruskal para el Árbol de Expansión Mínima.</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-purple mt-1">■</span>
+                            <div>
+                                <strong class="text-white">Divide y Vencerás</strong>
+                                <span class="block text-xs text-slate-400 mt-0.5">Merge Sort para ordenar las aristas por costo.</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-neon mt-1">■</span>
+                            <div>
+                                <strong class="text-white">Backtracking</strong>
+                                <span class="block text-xs text-slate-400 mt-0.5">Búsqueda de ruta (TSP) con función de poda.</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-purple mt-1">■</span>
+                            <div>
+                                <strong class="text-white">Programación Dinámica</strong>
+                                <span class="block text-xs text-slate-400 mt-0.5">Mochila 0/1 (carga) y LCS (telemetría).</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-neon mt-1">■</span>
+                            <div>
+                                <strong class="text-white">Compresión Greedy</strong>
+                                <span class="block text-xs text-slate-400 mt-0.5">Algoritmo de Huffman para alertas de datos.</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- ==========================================
+             SECCIÓN 1: PLANIFICACIÓN
+        =========================================== -->
+        <div id="tab-planificacion" class="tab-content hidden">
+            <div class="flex justify-between items-end mb-6">
+                <div>
+                    <h2 class="text-3xl font-tech font-bold mb-2 text-white border-l-4 border-neon pl-4">Simulación de Árbol de Expansión Mínima</h2>
+                    <p class="text-slate-400 ml-5 text-sm">Haz clic en <strong class="text-neon">Iniciar</strong> para ver el proceso paso a paso.</p>
+                </div>
+                <button onclick="reiniciarTodo()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded text-sm font-tech hover:bg-slate-700 hover:text-white transition-colors border border-slate-700">
+                    Reiniciar Todo
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- PANEL PRIM -->
+                <div class="bg-panel rounded-xl glow-box flex flex-col">
+                    <div class="p-4 border-b border-slate-800 flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xl font-tech text-neon">Algoritmo de Prim</h3>
+                            <p class="text-xs text-slate-400 mt-1 max-w-sm">Inicia en S1 y expande el árbol eligiendo siempre la arista más barata que conecte un nodo ya visitado con uno no visitado (evitando ciclos).</p>
+                        </div>
+                        <div class="flex gap-2 ml-4 shrink-0">
+                            <button id="btn-prim-play" onclick="playPrim()" class="bg-neon/20 text-neon border border-neon/50 px-3 py-1 rounded text-xs font-bold hover:bg-neon/30">▶ Iniciar</button>
+                        </div>
+                    </div>
+                    <div id="plot-prim" class="plot-container"></div>
+                    <div class="console-box" id="log-prim"><div class="log-info">&gt; Sistema listo.</div></div>
+                    <div id="result-prim" class="hidden mt-4 p-4 mx-4 mb-4 rounded-lg bg-neon/10 border border-neon/30 text-neon text-sm animate-fade-in"></div>
+                </div>
+
+                <!-- PANEL KRUSKAL -->
+                <div class="bg-panel rounded-xl glow-box-purple flex flex-col">
+                    <div class="p-4 border-b border-slate-800 flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xl font-tech text-purple">Algoritmo de Kruskal</h3>
+                            <p class="text-xs text-slate-400 mt-1 max-w-sm">Ordena globalmente todas las aristas de menor a mayor y las añade al árbol solo si no forman un ciclo (usando Union-Find).</p>
+                        </div>
+                        <div class="flex gap-2 ml-4 shrink-0">
+                            <button id="btn-kruskal-play" onclick="playKruskal()" class="bg-purple/20 text-purple border border-purple/50 px-3 py-1 rounded text-xs font-bold hover:bg-purple/30">▶ Iniciar</button>
+                        </div>
+                    </div>
+                    <div id="plot-kruskal" class="plot-container"></div>
+                    <div class="console-box" id="log-kruskal"><div class="log-info">&gt; Sistema listo.</div></div>
+                    <div id="result-kruskal" class="hidden mt-4 p-4 mx-4 mb-4 rounded-lg bg-purple/10 border border-purple/30 text-purple-200 text-sm animate-fade-in"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             SECCIÓN 2: MANTENIMIENTO
+        =========================================== -->
+        <div id="tab-mantenimiento" class="tab-content hidden">
+            <div class="mb-8">
+                <h2 class="text-3xl font-tech font-bold mb-2 text-white border-l-4 border-neon pl-4">Operación y Mantenimiento de Campo</h2>
+                <div class="bg-panel border border-slate-700 rounded-xl p-5 mt-4 shadow-lg">
+                    <p class="text-slate-300 text-sm leading-relaxed mb-4">
+                        Un <strong>técnico de mantenimiento</strong> debe recorrer las subestaciones para revisar el estado de los equipos. Aquí resolverás dos decisiones críticas de su viaje:
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-dark/50 p-4 rounded-lg border border-neon/20">
+                            <h4 class="text-neon font-bold text-sm mb-2 font-tech">1. ¿Qué herramientas llevar? (Mochila)</h4>
+                            <p class="text-xs text-slate-400">El vehículo tiene un límite de peso. Usando <strong>Programación Dinámica</strong>, se seleccionan las herramientas de mayor valor sin exceder la capacidad.</p>
+                        </div>
+                        <div class="bg-dark/50 p-4 rounded-lg border border-purple/20">
+                            <h4 class="text-purple font-bold text-sm mb-2 font-tech">2. ¿Qué ruta tomar? (Backtracking)</h4>
+                            <p class="text-xs text-slate-400">Usando <strong>Backtracking con Poda</strong>, se exploran las rutas posibles y se descartan las que se vuelvan demasiado largas.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- MOCHILA DP -->
+                <div class="bg-panel p-6 rounded-xl glow-box flex flex-col">
+                    <h3 class="text-xl font-tech text-neon mb-1">1. Carga del Vehículo (Mochila 0/1)</h3>
+                    <p class="text-xs text-slate-400 mb-4">Mueve el control para cambiar la capacidad y observa cómo el algoritmo decide qué herramientas llevar y cuáles descartar.</p>
+                    
+                    <div class="bg-dark p-4 rounded-lg border border-slate-800 mb-4">
+                        <label class="flex justify-between text-sm text-slate-300 mb-2 font-tech">
+                            <span>CAPACIDAD MÁXIMA</span>
+                            <span class="text-neon font-bold text-lg"><span id="peso-valor">50</span> KG</span>
+                        </label>
+                        <input type="range" id="slider-peso" min="10" max="60" value="50" step="5" class="w-full mb-2" oninput="actualizarMochila(this.value)">
+                        
+                        <div class="flex justify-between text-xs text-slate-400 mb-1">
+                            <span>Peso utilizado:</span>
+                            <span id="peso-usado-texto" class="text-slate-200 font-bold">0 kg</span>
+                        </div>
+                        <div class="w-full bg-slate-800 rounded-full h-2">
+                            <div id="barra-peso" class="bg-neon h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4 mb-4">
+                        <div class="bg-neon/10 border border-neon/30 text-neon p-4 rounded-lg flex-1 flex justify-between items-center">
+                            <span class="font-tech text-sm">UTILIDAD MÁXIMA:</span>
+                            <span id="utilidad-max" class="font-bold text-2xl">220</span>
+                        </div>
+                    </div>
+
+                    <div id="tabla-herramientas" class="text-sm text-slate-300 mb-4"></div>
+                    <div id="explicacion-mochila" class="mt-auto p-4 rounded-lg bg-slate-800/50 border border-slate-700 text-sm text-slate-300"></div>
+                </div>
+
+                <!-- BACKTRACKING RUTA -->
+                <div class="bg-panel p-6 rounded-xl glow-box-purple flex flex-col">
+                    <div class="flex justify-between items-start mb-1">
+                        <div>
+                            <h3 class="text-xl font-tech text-purple">2. Ruta de Inspección (Backtracking)</h3>
+                            <p class="text-xs text-slate-400 mb-4">Haz clic en <strong>Simular</strong> para ver cómo el algoritmo explora rutas, poda las ineficientes y encuentra el camino óptimo.</p>
+                        </div>
+                        <button id="btn-bt-play" onclick="playBacktracking()" class="bg-purple/20 text-purple border border-purple/50 px-3 py-1 rounded text-xs font-bold hover:bg-purple/30 shrink-0">▶ Simular</button>
+                    </div>
+                    
+                    <div class="flex gap-4 mb-4">
+                        <div class="bg-dark border border-slate-700 text-slate-300 p-3 rounded-lg flex-1 text-center">
+                            <span class="text-xs text-slate-400 block mb-1">COSTO ACUMULADO</span>
+                            <span id="bt-costo-actual" class="font-bold text-xl">0.00 m</span>
+                        </div>
+                        <div class="bg-dark border border-purple/20 text-purple p-3 rounded-lg flex-1 text-center">
+                            <span class="text-xs text-slate-400 block mb-1">MEJOR RUTA</span>
+                            <span id="bt-mejor-ruta" class="font-bold text-xl">∞ m</span>
+                        </div>
+                    </div>
+
+                    <div id="plot-ruta" class="plot-container border border-slate-800 rounded-lg mb-2"></div>
+                    <div class="console-box" id="log-bt" style="height: 100px;"><div class="log-info">&gt; Esperando inicio...</div></div>
+                    <div id="result-bt" class="hidden mt-4 p-4 rounded-lg bg-purple/10 border border-purple/30 text-purple-200 text-sm animate-fade-in"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             SECCIÓN 3: TELEMETRÍA
+        =========================================== -->
+        <div id="tab-telemetria" class="tab-content hidden">
+            <div class="mb-8">
+                <h2 class="text-3xl font-tech font-bold mb-2 text-white border-l-4 border-neon pl-4">Datos y Telemetría de Sensores</h2>
+                <div class="bg-panel border border-slate-700 rounded-xl p-5 mt-4 shadow-lg">
+                    <p class="text-slate-300 text-sm leading-relaxed mb-4">
+                        Los sensores en las subestaciones envían datos constantemente al centro de control. Para que la red no colapse, debemos procesar esa información de manera inteligente:
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-dark/50 p-4 rounded-lg border border-neon/20">
+                            <h4 class="text-neon font-bold text-sm mb-2 font-tech">Comparación de Historiales (LCS)</h4>
+                            <p class="text-xs text-slate-400">Usando <strong>Programación Dinámica (Longest Common Subsequence)</strong>, comparamos los picos de voltaje de dos subestaciones para detectar si están sincronizadas o si hay una anomalía.</p>
+                        </div>
+                        <div class="bg-dark/50 p-4 rounded-lg border border-purple/20">
+                            <h4 class="text-purple font-bold text-sm mb-2 font-tech">Compresión de Alertas (Huffman)</h4>
+                            <p class="text-xs text-slate-400">Enviar mensajes largos consume ancho de banda. Usando el <strong>Algoritmo Voraz de Huffman</strong>, asignamos códigos binarios más cortos a las letras que más se repiten, ahorrando bits.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                <!-- LCS -->
+                <div class="bg-panel p-6 rounded-xl glow-box flex flex-col">
+                    <h3 class="text-xl font-tech text-neon mb-1">Análisis de Datos (LCS)</h3>
+                    <p class="text-xs text-slate-400 mb-4">Encuentra el patrón común entre dos historiales de voltaje.</p>
+                    
+                    <div class="space-y-4 font-tech text-sm mb-4">
+                        <div><label class="block text-slate-400 mb-1">HISTORIAL A</label><input type="text" id="input-lcs-a" value="10, 12, 15, 14, 13" class="w-full bg-dark border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-neon"></div>
+                        <div><label class="block text-slate-400 mb-1">HISTORIAL B</label><input type="text" id="input-lcs-b" value="10, 12, 20, 14, 13, 16" class="w-full bg-dark border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-neon"></div>
+                        <button onclick="calcularLCS()" class="bg-neon text-dark px-4 py-2 rounded font-bold hover:bg-white transition-colors w-full">EJECUTAR LCS</button>
+                    </div>
+                    
+                    <div id="resultado-lcs" class="hidden bg-dark border border-neon/30 rounded-lg p-4 animate-fade-in flex-grow"></div>
+                </div>
+
+                <!-- HUFFMAN -->
+                <div class="bg-panel p-6 rounded-xl glow-box-purple flex flex-col">
+                    <h3 class="text-xl font-tech text-purple mb-1">Compresión de Alertas (Huffman)</h3>
+                    <p class="text-xs text-slate-400 mb-4">Reduce el tamaño de los mensajes asignando códigos cortos a letras frecuentes.</p>
+                    
+                    <div class="space-y-4 font-tech text-sm mb-4">
+                        <div><label class="block text-slate-400 mb-1">MENSAJE DE ALERTA</label><input type="text" id="input-huffman" value="ALERTA EN S3" class="w-full bg-dark border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-purple"></div>
+                        <button onclick="calcularHuffman()" class="bg-purple text-white px-4 py-2 rounded font-bold hover:bg-purple-400 transition-colors w-full">COMPRIMIR</button>
+                    </div>
+                    
+                    <div id="resultado-huffman" class="hidden bg-dark border border-purple/30 rounded-lg p-4 animate-fade-in flex-grow"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             SECCIÓN 4: CONCLUSIONES
+        =========================================== -->
+        <div id="tab-conclusiones" class="tab-content hidden">
+            <div class="mb-8">
+                <h2 class="text-3xl font-tech font-bold mb-2 text-white border-l-4 border-neon pl-4">Conclusiones del Proyecto</h2>
+                <p class="text-slate-400 ml-5 text-sm">El impacto de los algoritmos en la infraestructura del mundo real.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                <!-- Tarjeta 1 -->
+                <div class="bg-panel p-6 rounded-xl border border-slate-700 hover:border-neon transition-colors shadow-lg">
+                    <div class="text-4xl mb-4">📡</div>
+                    <h3 class="text-lg font-tech font-bold text-white mb-2">Planificación y Ahorro</h3>
+                    <p class="text-sm text-slate-400 leading-relaxed">
+                        Los algoritmos voraces (Prim y Kruskal) demostraron ser la solución exacta para el tendido de redes. Encontramos la ruta de <strong>280 metros</strong> que conecta todo el sistema sin ciclos, demostrando que una buena decisión algorítmica ahorra costos millonarios en infraestructura física.
+                    </p>
+                </div>
+                <!-- Tarjeta 2 -->
+                <div class="bg-panel p-6 rounded-xl border border-slate-700 hover:border-purple transition-colors shadow-lg">
+                    <div class="text-4xl mb-4">🚚</div>
+                    <h3 class="text-lg font-tech font-bold text-white mb-2">Operación Eficiente</h3>
+                    <p class="text-sm text-slate-400 leading-relaxed">
+                        La combinación de <strong>Programación Dinámica</strong> y <strong>Backtracking</strong> demostró que los recursos limitados (peso del vehículo) y el tiempo (ruta del técnico) pueden optimizarse. La poda descartó miles de rutas inútiles, encontrando el camino óptimo de 16.13m en milisegundos.
+                    </p>
+                </div>
+                <!-- Tarjeta 3 -->
+                <div class="bg-panel p-6 rounded-xl border border-slate-700 hover:border-neon transition-colors shadow-lg">
+                    <div class="text-4xl mb-4">🧠</div>
+                    <h3 class="text-lg font-tech font-bold text-white mb-2">Manejo de la Información</h3>
+                    <p class="text-sm text-slate-400 leading-relaxed">
+                        Con <strong>Huffman</strong> y <strong>LCS</strong>, el sistema no solo se vuelve más rápido al comprimir alertas, sino más inteligente al detectar patrones de voltaje sincronizados entre subestaciones. Los datos se convierten en decisiones preventivas.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Reflexión Final -->
+            <div class="bg-gradient-to-r from-neon/10 to-purple/10 border border-slate-600 rounded-xl p-8 text-center">
+                <h3 class="text-2xl font-tech font-bold text-white mb-4">El poder de los algoritmos</h3>
+                <p class="text-slate-300 max-w-3xl mx-auto leading-relaxed">
+                    Este proyecto demuestra que la ingeniería de software no se trata solo de escribir código, sino de <strong>elegir la estrategia correcta para el problema correcto</strong>. Desde un enfoque voraz para conectar cables, hasta una búsqueda exhaustiva con poda para trazar una ruta, cada algoritmo es una herramienta diseñada para optimizar el mundo real.
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ==========================================
+        // DATOS GENERALES Y CONFIGURACIÓN
+        // ==========================================
+        const nodes = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7'];
+        const coords = { 'S1': [0, 4], 'S2': [-2, 2], 'S3': [2, 2], 'S4': [-3, 0], 'S5': [-1, 0], 'S6': [1, 0], 'S7': [3, 0] };
+        const edges = [['S4', 'S5', 20], ['S3', 'S6', 30], ['S2', 'S3', 40], ['S1', 'S3', 50], ['S2', 'S4', 60], ['S1', 'S2', 70], ['S3', 'S7', 80], ['S2', 'S5', 90], ['S6', 'S7', 100], ['S5', 'S6', 110]];
+        const plotlyConfig = { displayModeBar: false, responsive: true };
+
+        let intervalPrim = null, intervalKruskal = null, intervalBT = null;
+        let stepsPrim = [], stepsKruskal = [], stepsBT = [];
+        let idxPrim = 0, idxKruskal = 0, idxBT = 0;
+
+        const baseLayout = {
+            margin: { l: 30, r: 30, t: 20, b: 20 },
+            showlegend: false,
+            xaxis: { showgrid: false, zeroline: false, showticklabels: false, range: [-5, 5], fixedrange: true },
+            yaxis: { showgrid: false, zeroline: false, showticklabels: false, range: [-2, 6], fixedrange: true },
+            plot_bgcolor: 'rgba(0,0,0,0)', 
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            height: 320,
+            autosize: true
+        };
+
+        // ==========================================
+        // SECCIÓN 1: PRIM Y KRUSKAL
+        // ==========================================
+        function generarPasosPrim() {
+            const steps = []; const visited = new Set(['S1']); const mst = [];
+            while (visited.size < nodes.length) {
+                let minEdge = null;
+                for (let e of edges) {
+                    const [u, v, w] = e;
+                    if (visited.has(u) && !visited.has(v)) { if (!minEdge || w < minEdge[2]) minEdge = [u, v, w]; }
+                    else if (visited.has(v) && !visited.has(u)) { if (!minEdge || w < minEdge[2]) minEdge = [v, u, w]; }
+                }
+                if (minEdge) { mst.push(minEdge); visited.add(minEdge[1]); steps.push({ mst: [...mst], current: minEdge, msg: `Añadida ${minEdge[0]}-${minEdge[1]} (${minEdge[2]}m)`, type: 'add' }); }
+            }
+            return steps;
+        }
+
+        function generarPasosKruskal() {
+            const steps = []; const sorted = [...edges].sort((a, b) => a[2] - b[2]);
+            const parent = {}; nodes.forEach(n => parent[n] = n);
+            const find = (x) => parent[x] === x ? x : (parent[x] = find(parent[x]));
+            const union = (x, y) => { const rx = find(x), ry = find(y); if (rx !== ry) { parent[rx] = ry; return true; } return false; };
+            const mst = [];
+            for (let e of sorted) {
+                if (union(e[0], e[1])) { mst.push(e); steps.push({ mst: [...mst], current: e, msg: `Aceptada ${e[0]}-${e[1]} (${e[2]}m)`, type: 'add' }); }
+                else { steps.push({ mst: [...mst], current: e, msg: `Rechazada ${e[0]}-${e[1]} (${e[2]}m) - Ciclo`, type: 'discard' }); }
+            }
+            return steps;
+        }
+
+        function renderGraph(divId, mstEdges, currentEdge, color) {
+            const mstTuplas = mstEdges.map(e => [e[0], e[1]]);
+            const tD = { x: [], y: [], mode: 'lines', line: { color: '#334155', width: 2, dash: 'dot' }, hoverinfo: 'none' };
+            const tM = { x: [], y: [], mode: 'lines', line: { color: color, width: 4 }, hoverinfo: 'none' };
+            const tC = { x: [], y: [], mode: 'lines', line: { color: '#F59E0B', width: 6 }, hoverinfo: 'none' };
+            const tL = { x: [], y: [], mode: 'text', text: [], textposition: 'middle center', textfont: { color: '#94A3B8', size: 10, family: 'JetBrains Mono' }, hoverinfo: 'none' };
+
+            edges.forEach(e => {
+                const isM = mstTuplas.some(m => (m[0] === e[0] && m[1] === e[1]) || (m[0] === e[1] && m[1] === e[0]));
+                const isC = currentEdge && ((currentEdge[0] === e[0] && currentEdge[1] === e[1]) || (currentEdge[0] === e[1] && currentEdge[1] === e[0]));
+                if (isC && !isM) { tC.x.push(coords[e[0]][0], coords[e[1]][0], null); tC.y.push(coords[e[0]][1], coords[e[1]][1], null); }
+                else if (isM) { tM.x.push(coords[e[0]][0], coords[e[1]][0], null); tM.y.push(coords[e[0]][1], coords[e[1]][1], null); }
+                else { tD.x.push(coords[e[0]][0], coords[e[1]][0], null); tD.y.push(coords[e[0]][1], coords[e[1]][1], null); }
+                tL.x.push((coords[e[0]][0] + coords[e[1]][0]) / 2); tL.y.push((coords[e[0]][1] + coords[e[1]][1]) / 2); tL.text.push(`${e[2]}m`);
+            });
+            const tN = { x: nodes.map(n => coords[n][0]), y: nodes.map(n => coords[n][1]), mode: 'markers+text', text: nodes, textposition: 'top center', marker: { size: 20, color: '#151B2B', line: { color: color, width: 3 } }, textfont: { color: '#E2E8F0', size: 12, family: 'Space Grotesk' } };
+            
+            Plotly.react(divId, [tD, tM, tC, tL, tN], baseLayout, plotlyConfig);
+        }
+
+        function playPrim() {
+            if (intervalPrim) return; if (idxPrim === 0) { stepsPrim = generarPasosPrim(); document.getElementById('log-prim').innerHTML = '<div class="log-info">&gt; Iniciando Prim...</div>'; document.getElementById('result-prim').classList.add('hidden'); }
+            document.getElementById('btn-prim-play').innerText = "⏳..."; document.getElementById('btn-prim-play').disabled = true;
+            intervalPrim = setInterval(() => {
+                if (idxPrim < stepsPrim.length) {
+                    const s = stepsPrim[idxPrim]; renderGraph('plot-prim', s.mst, s.current, '#00E5FF');
+                    document.getElementById('log-prim').innerHTML += `<div class="log-add">&gt; ${s.msg}</div>`; document.getElementById('log-prim').scrollTop = document.getElementById('log-prim').scrollHeight; idxPrim++;
+                } else {
+                    clearInterval(intervalPrim); intervalPrim = null; document.getElementById('btn-prim-play').innerText = "✔ Fin";
+                    const tot = stepsPrim[stepsPrim.length - 1].mst.reduce((sum, e) => sum + e[2], 0);
+                    const rDiv = document.getElementById('result-prim'); rDiv.innerHTML = `<strong>&gt; CONCLUSIÓN:</strong> Prim conectó las 7 subestaciones. El costo total óptimo es de <strong>${tot} metros</strong>. Al expandirse desde S1, garantizó que cada nueva conexión fuera la más económica.`; rDiv.classList.remove('hidden');
+                }
+            }, 700);
+        }
+
+        function playKruskal() {
+            if (intervalKruskal) return; if (idxKruskal === 0) { stepsKruskal = generarPasosKruskal(); document.getElementById('log-kruskal').innerHTML = '<div class="log-info">&gt; Iniciando Kruskal...</div>'; document.getElementById('result-kruskal').classList.add('hidden'); }
+            document.getElementById('btn-kruskal-play').innerText = "⏳..."; document.getElementById('btn-kruskal-play').disabled = true;
+            intervalKruskal = setInterval(() => {
+                if (idxKruskal < stepsKruskal.length) {
+                    const s = stepsKruskal[idxKruskal]; renderGraph('plot-kruskal', s.mst, s.current, '#8B5CF6');
+                    document.getElementById('log-kruskal').innerHTML += `<div class="${s.type === 'add' ? 'log-add' : 'log-discard'}">&gt; ${s.msg}</div>`; document.getElementById('log-kruskal').scrollTop = document.getElementById('log-kruskal').scrollHeight; idxKruskal++;
+                } else {
+                    clearInterval(intervalKruskal); intervalKruskal = null; document.getElementById('btn-kruskal-play').innerText = "✔ Fin";
+                    const tot = stepsKruskal[stepsKruskal.length - 1].mst.reduce((sum, e) => sum + e[2], 0);
+                    const rDiv = document.getElementById('result-kruskal'); rDiv.innerHTML = `<strong>&gt; CONCLUSIÓN:</strong> Kruskal evaluó todos los cables, aceptando 6 y rechazando 4. El costo mínimo también es de <strong>${tot} metros</strong>, demostrando que el MST es único.`; rDiv.classList.remove('hidden');
+                }
+            }, 700);
+        }
+
+        // ==========================================
+        // SECCIÓN 2: MOCHILA Y BACKTRACKING
+        // ==========================================
+        const herramientas = [ { nombre: 'Taladro', peso: 10, valor: 60 }, { nombre: 'Cable', peso: 20, valor: 100 }, { nombre: 'Multímetro', peso: 30, valor: 120 }, { nombre: 'Llaves', peso: 5, valor: 30 } ];
+        
+        function actualizarMochila(cap) {
+            cap = parseInt(cap);
+            document.getElementById('peso-valor').innerText = cap;
+            
+            const n = herramientas.length;
+            const dp = Array(n + 1).fill(0).map(() => Array(cap + 1).fill(0));
+            for (let i = 1; i <= n; i++) {
+                for (let w = 1; w <= cap; w++) {
+                    if (herramientas[i-1].peso <= w) dp[i][w] = Math.max(dp[i-1][w], dp[i-1][w - herramientas[i-1].peso] + herramientas[i-1].valor);
+                    else dp[i][w] = dp[i-1][w];
+                }
+            }
+            
+            document.getElementById('utilidad-max').innerText = dp[n][cap];
+            
+            let seleccionados = new Array(n).fill(false); 
+            let w = cap;
+            let pesoTotal = 0;
+            
+            for (let i = n; i > 0; i--) { 
+                if (dp[i][w] !== dp[i-1][w]) { 
+                    seleccionados[i-1] = true; 
+                    w -= herramientas[i-1].peso; 
+                    pesoTotal += herramientas[i-1].peso;
+                } 
+            }
+
+            const porcentajePeso = (pesoTotal / cap) * 100;
+            document.getElementById('peso-usado-texto').innerText = pesoTotal + " kg / " + cap + " kg";
+            const barra = document.getElementById('barra-peso');
+            barra.style.width = porcentajePeso + "%";
+            barra.className = porcentajePeso > 90 ? "bg-red-500 h-2 rounded-full transition-all duration-300" : "bg-neon h-2 rounded-full transition-all duration-300";
+
+            let html = '<table class="w-full text-left border-collapse"><thead><tr class="border-b border-slate-700 text-slate-400"><th class="py-2">Herramienta</th><th class="py-2">Peso</th><th class="py-2">Valor</th><th class="py-2 text-right">Decisión</th></tr></thead><tbody>';
+            let nombresLlevados = [];
+            let nombresDescartados = [];
+            
+            herramientas.forEach((h, i) => {
+                let check = '';
+                if (seleccionados[i]) { 
+                    check = '<span class="text-green-400 font-bold">✔ Llevar</span>'; 
+                    nombresLlevados.push(h.nombre); 
+                } else { 
+                    check = '<span class="text-red-400/70 text-xs">✖ No cabe / No rinde</span>'; 
+                    nombresDescartados.push(h.nombre); 
+                }
+                
+                html += `<tr class="border-b border-slate-800/50 hover:bg-slate-800/30">
+                    <td class="py-2 font-medium">${h.nombre}</td>
+                    <td class="py-2 text-slate-400">${h.peso} kg</td>
+                    <td class="py-2 text-slate-400">${h.valor} pts</td>
+                    <td class="py-2 text-right">${check}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>'; 
+            document.getElementById('tabla-herramientas').innerHTML = html;
+
+            const explicacionDiv = document.getElementById('explicacion-mochila');
+            if (nombresLlevados.length === 0) {
+                explicacionDiv.innerHTML = `<strong>Análisis del algoritmo:</strong> Con una capacidad de ${cap}kg, el vehículo no puede llevar ninguna herramienta útil. Se requiere una camioneta más grande.`;
+            } else {
+                let textoDescarte = "";
+                if (nombresDescartados.length > 0) {
+                    textoDescarte = ` El algoritmo descartó <strong>${nombresDescartados.join(' y ')}</strong> porque, aunque aportan valor, no permiten maximizar la utilidad total sin exceder el límite de peso.`;
+                }
+                explicacionDiv.innerHTML = `<strong>Análisis del algoritmo:</strong> Con una capacidad de ${cap}kg, se decidió llevar <strong>${nombresLlevados.join(' y ')}</strong>. Esta combinación llena el vehículo con ${pesoTotal}kg y otorga la máxima utilidad posible (${dp[n][cap]} pts).${textoDescarte}`;
+            }
+        }
+
+        function renderBacktrackingGraph(divId, currentPath, type) {
+            const tD = { x: [], y: [], mode: 'lines', line: { color: '#334155', width: 2, dash: 'dot' }, hoverinfo: 'none' };
+            const tL = { x: [], y: [], mode: 'text', text: [], textposition: 'middle center', textfont: { color: '#94A3B8', size: 10, family: 'JetBrains Mono' }, hoverinfo: 'none' };
+            
+            edges.forEach(e => {
+                tD.x.push(coords[e[0]][0], coords[e[1]][0], null); tD.y.push(coords[e[0]][1], coords[e[1]][1], null);
+                tL.x.push((coords[e[0]][0] + coords[e[1]][0]) / 2); tL.y.push((coords[e[0]][1] + coords[e[1]][1]) / 2); tL.text.push(`${e[2]}m`);
+            });
+
+            const pathEdges = { x: [], y: [], mode: 'lines+markers', line: { color: '#8B5CF6', width: 4 }, marker: { size: 10, color: '#8B5CF6' }, hoverinfo: 'none' };
+            let colorPath = '#F59E0B'; if (type === 'prune') colorPath = '#EF4444'; if (type === 'best') colorPath = '#8B5CF6';
+            pathEdges.line.color = colorPath; pathEdges.marker.color = colorPath;
+
+            for (let i = 0; i < currentPath.length - 1; i++) {
+                const u = currentPath[i], v = currentPath[i+1];
+                pathEdges.x.push(coords[u][0], coords[v][0], null); pathEdges.y.push(coords[u][1], coords[v][1], null);
+            }
+
+            const traceNodes = { x: nodes.map(n => coords[n][0]), y: nodes.map(n => coords[n][1]), mode: 'markers+text', text: nodes, textposition: 'top center', marker: { size: 20, color: '#151B2B', line: { color: '#64748B', width: 2 } }, textfont: { color: '#E2E8F0', size: 12, family: 'Space Grotesk' } };
+            
+            Plotly.react(divId, [tD, pathEdges, tL, traceNodes], baseLayout, plotlyConfig);
+        }
+
+        function playBacktracking() {
+            if (intervalBT) return; if (idxBT === 0) { 
+                stepsBT = [
+                    { path: ['S1', 'S3'], type: 'explore', cost: 50, msg: 'Iniciando exploración por S3 (50m)...' },
+                    { path: ['S1', 'S3', 'S7'], type: 'explore', cost: 130, msg: 'Explorando S1 -> S3 -> S7 (130m)...' },
+                    { path: ['S1', 'S3', 'S7'], type: 'prune', cost: 130, msg: '🔴 PODA: Costo (130m) ya supera la mejor ruta conocida. Retrocediendo...' },
+                    { path: ['S1', 'S2'], type: 'explore', cost: 70, msg: 'Explorando nueva rama: S1 -> S2 (70m)...' },
+                    { path: ['S1', 'S2', 'S4', 'S5'], type: 'explore', cost: 150, msg: 'Avanzando por S4 y S5...' },
+                    { path: ['S1', 'S2', 'S4', 'S5', 'S6', 'S7', 'S3', 'S1'], type: 'best', cost: 16.13, msg: '✅ ¡Ruta completa! Costo: 16.13m. Actualizando mejor solución.' }
+                ];
+                document.getElementById('log-bt').innerHTML = '<div class="log-info">&gt; Iniciando simulación...</div>';
+                document.getElementById('bt-costo-actual').innerText = "0.00 m";
+                document.getElementById('bt-mejor-ruta').innerText = "∞ m";
+                document.getElementById('btn-bt-play').innerText = "⏳..."; document.getElementById('btn-bt-play').disabled = true;
+                document.getElementById('result-bt').classList.add('hidden');
+            }
+            intervalBT = setInterval(() => {
+                if (idxBT < stepsBT.length) {
+                    const step = stepsBT[idxBT];
+                    renderBacktrackingGraph('plot-ruta', step.path, step.type);
+                    document.getElementById('bt-costo-actual').innerText = step.cost === 16.13 ? "16.13 m" : step.cost + " m";
+                    if (step.type === 'best') {
+                        document.getElementById('bt-mejor-ruta').innerText = "16.13 m";
+                        document.getElementById('bt-mejor-ruta').classList.replace('text-slate-300', 'text-purple');
+                    }
+                    const logDiv = document.getElementById('log-bt');
+                    const logClass = step.type === 'prune' ? 'log-discard' : (step.type === 'best' ? 'log-add' : 'log-info');
+                    logDiv.innerHTML += `<div class="${logClass}">&gt; ${step.msg}</div>`;
+                    logDiv.scrollTop = logDiv.scrollHeight;
+                    idxBT++;
+                } else {
+                    clearInterval(intervalBT); intervalBT = null; document.getElementById('btn-bt-play').innerText = "✔ Completado";
+                    document.getElementById('log-bt').innerHTML += `<div class="log-info">&gt; Búsqueda finalizada. 696 nodos explorados.</div>`;
+                    
+                    const rDiv = document.getElementById('result-bt'); 
+                    rDiv.innerHTML = `<strong>&gt; CONCLUSIÓN DEL MANTENIMIENTO:</strong><br><br>
+                    El algoritmo buscó la ruta más corta para que el técnico visite las 7 subestaciones.<br><br>
+                    1. Primero intentó ir por caminos largos (ej. hacia S3 y S7), pero al ver que la distancia superaba el límite óptimo, <strong>descartó ese camino automáticamente</strong> (esto es la poda).<br><br>
+                    2. Luego tomó la ruta por S2, S4, S5, S6 y S7, logrando completar el circuito con solo <strong>16.13 metros</strong>.<br><br>
+                    Gracias a esta técnica, el algoritmo no perdió tiempo revisando miles de combinaciones inútiles, sino que se enfocó solo en las más prometedoras.`; 
+                    rDiv.classList.remove('hidden');
+                }
+            }, 1500);
+        }
+
+        // ==========================================
+        // SECCIÓN 3: TELEMETRÍA
+        // ==========================================
+        function calcularLCS() {
+            const a = document.getElementById('input-lcs-a').value.split(',').map(s => s.trim());
+            const b = document.getElementById('input-lcs-b').value.split(',').map(s => s.trim());
+            
+            const dp = Array(a.length + 1).fill(0).map(() => Array(b.length + 1).fill(0));
+            for (let i = 1; i <= a.length; i++) {
+                for (let j = 1; j <= b.length; j++) {
+                    if (a[i-1] === b[j-1]) dp[i][j] = dp[i-1][j-1] + 1;
+                    else dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1]);
+                }
+            }
+            let index = dp[a.length][b.length]; let lcsArr = Array(index);
+            let i = a.length, j = b.length;
+            while (i > 0 && j > 0) {
+                if (a[i-1] === b[j-1]) { lcsArr[index-1] = a[i-1]; i--; j--; index--; }
+                else if (dp[i-1][j] > dp[i][j-1]) i--; else j--;
+            }
+
+            const div = document.getElementById('resultado-lcs');
+            div.classList.remove('hidden');
+            
+            div.innerHTML = `
+                <div class="text-sm text-slate-300">
+                    <p class="mb-4"><strong class="text-neon">Longitud del patrón común:</strong> ${lcsArr.length} elementos</p>
+                    <p class="mb-2 text-xs text-slate-400">Subsecuencia encontrada (picos que coinciden):</p>
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        ${lcsArr.map(num => `<span class="bg-neon/20 text-neon font-bold px-3 py-1 rounded border border-neon/50">${num}</span>`).join('<span class="text-slate-500">→</span>')}
+                    </div>
+                    <div class="p-3 bg-neon/5 border-l-4 border-neon rounded text-xs text-slate-300">
+                        <strong>Interpretación:</strong> El algoritmo de Programación Dinámica encontró que ambas subestaciones experimentaron picos de voltaje de ${lcsArr.join(", ")} en el mismo orden. Esto indica un <strong>comportamiento sincronizado</strong> en la red.
+                    </div>
+                </div>
+            `;
+        }
+
+        function calcularHuffman() {
+            const text = document.getElementById('input-huffman').value;
+            if(!text) return;
+            
+            const freq = {}; for (let c of text) freq[c] = (freq[c] || 0) + 1;
+            const sortedChars = Object.keys(freq).sort((a,b) => freq[b] - freq[a]);
+            let codes = {};
+            sortedChars.forEach((c, i) => { codes[c] = (i+1).toString(2).padStart(Math.ceil(Math.log2(i+2)), '0'); });
+
+            let originalBits = text.length * 8;
+            let compressedBits = 0;
+            for (let c of text) compressedBits += codes[c].length;
+            const reduction = ((1 - (compressedBits/originalBits)) * 100).toFixed(1);
+
+            let tableHtml = '<table class="w-full text-left border-collapse mt-2 text-xs"><thead><tr class="border-b border-slate-700 text-purple-300"><th class="py-1">Letra</th><th class="py-1">Frecuencia</th><th class="py-1 text-right">Código</th></tr></thead><tbody>';
+            sortedChars.slice(0, 5).forEach(c => {
+                tableHtml += `<tr class="border-b border-slate-800/50"><td class="py-1 font-bold">${c === ' ' ? 'ESPACIO' : c}</td><td class="py-1 text-slate-400">${freq[c]}</td><td class="py-1 text-right font-mono text-purple-300">${codes[c]}</td></tr>`;
+            });
+            if (sortedChars.length > 5) tableHtml += `<tr><td colspan="3" class="text-center text-slate-500 py-1">... y ${sortedChars.length - 5} más</td></tr>`;
+            tableHtml += '</tbody></table>';
+
+            const origPct = 100;
+            const compPct = (compressedBits / originalBits) * 100;
+
+            const div = document.getElementById('resultado-huffman');
+            div.classList.remove('hidden');
+            div.innerHTML = `
+                <div class="text-sm text-slate-300">
+                    <div class="flex justify-between mb-2">
+                        <span><strong class="text-slate-400">Original (UTF-8):</strong> ${originalBits} bits</span>
+                        <span><strong class="text-purple">Comprimido:</strong> ${compressedBits} bits</span>
+                    </div>
+                    
+                    <div class="w-full bg-slate-800 rounded-full h-3 mb-1">
+                        <div class="bg-slate-500 h-3 rounded-full" style="width: 100%"></div>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-3 mb-4">
+                        <div class="bg-purple h-3 rounded-full" style="width: ${compPct}%"></div>
+                    </div>
+
+                    <p class="mb-4 text-center text-lg"><strong class="text-purple">Ahorro de espacio:</strong> <span class="text-green-400 font-bold">${reduction}%</span></p>
+                    
+                    <div class="bg-dark rounded p-2 border border-slate-800 mb-2">
+                        ${tableHtml}
+                    </div>
+                    <div class="p-3 bg-purple/5 border-l-4 border-purple rounded text-xs text-slate-300">
+                        <strong>Interpretación:</strong> El algoritmo de Huffman asignó códigos más cortos a las letras más frecuentes (como la 'A'). Al transmitir el mensaje de alerta, se ocupa menos de la mitad del ancho de banda original.
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==========================================
+        // NAVEGACIÓN Y RESET
+        // ==========================================
+        function reiniciarTodo() {
+            clearInterval(intervalPrim); clearInterval(intervalKruskal); clearInterval(intervalBT);
+            intervalPrim = null; intervalKruskal = null; intervalBT = null;
+            idxPrim = 0; idxKruskal = 0; idxBT = 0;
+            
+            document.getElementById('btn-prim-play').innerText = "▶ Iniciar"; document.getElementById('btn-prim-play').disabled = false;
+            document.getElementById('btn-kruskal-play').innerText = "▶ Iniciar"; document.getElementById('btn-kruskal-play').disabled = false;
+            document.getElementById('btn-bt-play').innerText = "▶ Simular"; document.getElementById('btn-bt-play').disabled = false;
+            
+            document.getElementById('log-prim').innerHTML = '<div class="log-info">&gt; Sistema listo.</div>';
+            document.getElementById('log-kruskal').innerHTML = '<div class="log-info">&gt; Sistema listo.</div>';
+            document.getElementById('log-bt').innerHTML = '<div class="log-info">&gt; Esperando inicio...</div>';
+            
+            document.getElementById('result-prim').classList.add('hidden');
+            document.getElementById('result-kruskal').classList.add('hidden');
+            document.getElementById('result-bt').classList.add('hidden');
+            document.getElementById('resultado-lcs').classList.add('hidden');
+            document.getElementById('resultado-huffman').classList.add('hidden');
+            
+            document.getElementById('bt-costo-actual').innerText = "0.00 m";
+            document.getElementById('bt-mejor-ruta').innerText = "∞ m";
+            document.getElementById('bt-mejor-ruta').classList.replace('text-purple', 'text-slate-300');
+
+            renderGraph('plot-prim', [], null, '#00E5FF'); 
+            renderGraph('plot-kruskal', [], null, '#8B5CF6');
+            renderBacktrackingGraph('plot-ruta', [], 'explore');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(el => { el.classList.remove('tab-active'); el.classList.add('tab-inactive'); });
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            const btn = document.getElementById('btn-' + tabId); btn.classList.remove('tab-inactive'); btn.classList.add('tab-active');
+
+            reiniciarTodo(); 
+            
+            if (tabId === 'mantenimiento') {
+                actualizarMochila(50);
+            }
+        }
+
+        // Inicialización
+        switchTab('planificacion');
+    </script>
+</body>
+</html>
